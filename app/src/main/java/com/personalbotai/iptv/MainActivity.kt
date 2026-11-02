@@ -11,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -39,7 +40,7 @@ class ChannelAdapter(private var items: List<Channel>, private val onClick: (Cha
             isClickable = true
             setOnFocusChangeListener { v, hasFocus ->
                 if (hasFocus) {
-                    v.setBackgroundColor(0xFFE50914.toInt()) // Netflix Red focus
+                    v.setBackgroundColor(0xFFE50914.toInt()) // Red focus
                     v.scaleX = 1.08f
                     v.scaleY = 1.08f
                 } else {
@@ -52,7 +53,7 @@ class ChannelAdapter(private var items: List<Channel>, private val onClick: (Cha
 
         val title = TextView(context).apply {
             setTextColor(Color.WHITE)
-            textSize = 16f
+            textSize = 15f
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
             setTypeface(null, Typeface.BOLD)
@@ -84,10 +85,8 @@ class ChannelAdapter(private var items: List<Channel>, private val onClick: (Cha
     override fun getItemCount() = items.size
 }
 
-class CategoryRowAdapter(private val categories: Map<String, List<Channel>>, private val onChannelClick: (Channel) -> Unit) :
+class CategoryRowAdapter(private val categories: List<Pair<String, List<Channel>>>, private val onChannelClick: (Channel) -> Unit) :
     RecyclerView.Adapter<CategoryRowAdapter.RowViewHolder>() {
-
-    val keys = categories.keys.toList()
 
     class RowViewHolder(val root: LinearLayout, val title: TextView, val recycler: RecyclerView) : RecyclerView.ViewHolder(root)
 
@@ -101,15 +100,15 @@ class CategoryRowAdapter(private val categories: Map<String, List<Channel>>, pri
                 RecyclerView.LayoutParams.MATCH_PARENT,
                 RecyclerView.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(0, (16 * dp).toInt(), 0, (16 * dp).toInt())
+                setMargins(0, (14 * dp).toInt(), 0, (14 * dp).toInt())
             }
         }
 
         val title = TextView(context).apply {
             setTextColor(Color.WHITE)
-            textSize = 20f
+            textSize = 18f
             setTypeface(null, Typeface.BOLD)
-            setPadding((40 * dp).toInt(), 0, 0, (12 * dp).toInt())
+            setPadding((40 * dp).toInt(), 0, 0, (10 * dp).toInt())
         }
         root.addView(title)
 
@@ -126,19 +125,20 @@ class CategoryRowAdapter(private val categories: Map<String, List<Channel>>, pri
     }
 
     override fun onBindViewHolder(holder: RowViewHolder, position: Int) {
-        val cat = keys[position]
-        val list = categories[cat].orEmpty()
-        holder.title.text = cat
+        val (cat, list) = categories[position]
+        holder.title.text = "$cat (${list.size})"
         holder.recycler.adapter = ChannelAdapter(list, onChannelClick)
     }
 
-    override fun getItemCount() = keys.size
+    override fun getItemCount() = categories.size
 }
 
 class MainActivity : Activity() {
 
     private lateinit var mainContainer: LinearLayout
     private lateinit var headerTitle: TextView
+    private lateinit var statusText: TextView
+    private lateinit var progressBar: ProgressBar
     private lateinit var categoryRecycler: RecyclerView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -156,27 +156,35 @@ class MainActivity : Activity() {
             )
         }
 
-        // Netflix Header bar
+        // Header bar: "IPTV | Live TV Worldwide" (Tanpa nama Netflix)
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding((40 * dp).toInt(), (24 * dp).toInt(), (40 * dp).toInt(), (16 * dp).toInt())
+            setPadding((40 * dp).toInt(), (20 * dp).toInt(), (40 * dp).toInt(), (12 * dp).toInt())
             gravity = Gravity.CENTER_VERTICAL
         }
 
         headerTitle = TextView(this).apply {
-            text = "NETFLIX IPTV"
-            setTextColor(0xFFE50914.toInt())
+            text = "IPTV"
+            setTextColor(0xFFE50914.toInt()) // Red accent
             textSize = 28f
             setTypeface(null, Typeface.BOLD)
         }
         header.addView(headerTitle)
 
-        val subtitle = TextView(this).apply {
-            text = "  |  Live TV Worldwide"
+        statusText = TextView(this).apply {
+            text = "  |  Memuat channel global..."
             setTextColor(0xFFB3B3B3.toInt())
-            textSize = 16f
+            textSize = 15f
         }
-        header.addView(subtitle)
+        header.addView(statusText)
+
+        progressBar = ProgressBar(this).apply {
+            val size = (24 * dp).toInt()
+            layoutParams = LinearLayout.LayoutParams(size, size).apply {
+                leftMargin = (16 * dp).toInt()
+            }
+        }
+        header.addView(progressBar)
 
         mainContainer.addView(header)
 
@@ -192,15 +200,25 @@ class MainActivity : Activity() {
 
         setContentView(mainContainer)
 
-        loadData()
         ChannelRepository.onLoaded = {
-            loadData()
+            renderChannels()
         }
+        ChannelRepository.load()
     }
 
-    private fun loadData() {
-        val grouped = ChannelRepository.channels.groupBy { it.group.ifEmpty { "General" } }
-        categoryRecycler.adapter = CategoryRowAdapter(grouped) { channel ->
+    private fun renderChannels() {
+        val total = ChannelRepository.channels.size
+        statusText.text = "  |  $total Channels Worldwide"
+        progressBar.visibility = View.GONE
+
+        // Group by category/country, prioritize Indonesia first, then popular ones
+        val groups = ChannelRepository.channels.groupBy { it.group.ifEmpty { "Worldwide" } }
+        val sortedList = groups.toList().sortedWith(compareByDescending { 
+            if (it.first.equals("Indonesia", ignoreCase = true) || it.first.equals("ID", ignoreCase = true)) 100000 
+            else it.second.size 
+        })
+
+        categoryRecycler.adapter = CategoryRowAdapter(sortedList) { channel ->
             val intent = Intent(this, PlayerActivity::class.java).apply {
                 putExtra("name", channel.name)
                 putExtra("url", channel.url)
