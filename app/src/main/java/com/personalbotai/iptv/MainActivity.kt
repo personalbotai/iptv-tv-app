@@ -3,12 +3,15 @@ package com.personalbotai.iptv
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Bundle
+import android.text.TextUtils
 import android.view.Gravity
-import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
-import android.widget.*
+import android.view.WindowManager
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
@@ -16,11 +19,6 @@ class ChannelAdapter(private var items: List<Channel>, private val onClick: (Cha
     RecyclerView.Adapter<ChannelAdapter.ViewHolder>() {
 
     class ViewHolder(val card: LinearLayout, val title: TextView, val category: TextView) : RecyclerView.ViewHolder(card)
-
-    fun update(newItems: List<Channel>) {
-        items = newItems
-        notifyDataSetChanged()
-    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val context = parent.context
@@ -39,22 +37,37 @@ class ChannelAdapter(private var items: List<Channel>, private val onClick: (Cha
             isFocusable = true
             isFocusableInTouchMode = true
             isClickable = true
-            setBackgroundResource(android.R.drawable.select_item_background)
+            setOnFocusChangeListener { v, hasFocus ->
+                if (hasFocus) {
+                    v.setBackgroundColor(0xFFE50914.toInt()) // Netflix Red focus
+                    v.scaleX = 1.08f
+                    v.scaleY = 1.08f
+                } else {
+                    v.setBackgroundColor(0xFF1F1F1F.toInt())
+                    v.scaleX = 1.0f
+                    v.scaleY = 1.0f
+                }
+            }
         }
 
         val title = TextView(context).apply {
             setTextColor(Color.WHITE)
             textSize = 16f
             maxLines = 2
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            ellipsize = TextUtils.TruncateAt.END
+            setTypeface(null, Typeface.BOLD)
         }
         card.addView(title)
 
         val category = TextView(context).apply {
             setTextColor(0xFFB3B3B3.toInt())
             textSize = 12f
-            setMargins(0, (8 * dp).toInt(), 0, 0)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = (8 * dp).toInt()
+            }
         }
         card.addView(category)
 
@@ -95,7 +108,7 @@ class CategoryRowAdapter(private val categories: Map<String, List<Channel>>, pri
         val title = TextView(context).apply {
             setTextColor(Color.WHITE)
             textSize = 20f
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
             setPadding((40 * dp).toInt(), 0, 0, (12 * dp).toInt())
         }
         root.addView(title)
@@ -152,9 +165,9 @@ class MainActivity : Activity() {
 
         headerTitle = TextView(this).apply {
             text = "NETFLIX IPTV"
-            setTextColor(Color.RED)
+            setTextColor(0xFFE50914.toInt())
             textSize = 28f
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
         }
         header.addView(headerTitle)
 
